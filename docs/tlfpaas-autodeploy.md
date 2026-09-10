@@ -8,7 +8,7 @@ by this template.
 
 ## Current Deployment Shape
 
-`templatePWA` is a same-origin app with two public services:
+`gounie` (built from `templatePWA`) is a same-origin app with two public services:
 
 - `frontend` serves the built React app through nginx on port `8080`;
 - `backend` serves JSON APIs and WebSocket on port `8081`;
@@ -22,14 +22,14 @@ browser gateway behavior lives in `docker-compose.local.yml`.
 
 ## Files And Ownership
 
-| File | Purpose |
-|---|---|
-| `docker-compose.yml` | Platform-safe service shape for tlfpaas and same-origin production. |
+| File                       | Purpose                                                                 |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `docker-compose.yml`       | Platform-safe service shape for tlfpaas and same-origin production.     |
 | `docker-compose.local.yml` | Local Docker-only gateway and frontend build args. Not used by tlfpaas. |
-| `.docker.env.example` | Student-facing Docker config template. Non-secret values only. |
-| `.docker.env` | Local copy ignored by git. Do not commit real secrets. |
-| `frontend/Dockerfile` | Production frontend image. Final stage must run as non-root `nginx`. |
-| `backend/Dockerfile` | Production backend image. Final stage must run as non-root `app`. |
+| `.docker.env.example`      | Student-facing Docker config template. Non-secret values only.          |
+| `.docker.env`              | Local copy ignored by git. Do not commit real secrets.                  |
+| `frontend/Dockerfile`      | Production frontend image. Final stage must run as non-root `nginx`.    |
+| `backend/Dockerfile`       | Production backend image. Final stage must run as non-root `app`.       |
 
 ## Base Compose Rules
 
@@ -114,9 +114,17 @@ FRONTEND_ORIGIN=http://localhost:5105
 VITE_BACKEND_URL=/api
 ```
 
-`COOKIE_SECRET=local-docker-secret` is only a local placeholder. In tlfpaas
-production, configure `COOKIE_SECRET` in the student Secrets UI and click
-`Redeploy now`.
+`COOKIE_SECRET=local-docker-secret` and `ADMIN_PASSWORD=local-docker-admin` are
+only local placeholders. In tlfpaas production, configure these in the student
+Secrets UI and click `Redeploy now`:
+
+- secrets: `COOKIE_SECRET`, `ADMIN_PASSWORD`, `SMTP_USER`, `SMTP_PASSWORD`;
+- config: `APP_MODE=prod`, `ALLOWED_EMAIL_DOMAINS`, `EMAIL_MODE=smtp`,
+  `SMTP_HOST`, `SMTP_PORT`, `EMAIL_FROM`, `KARMA_FLOOR`, `FRONTEND_ORIGIN`.
+
+`docker-compose.yml` only passes these through with `${NAME}`. In `APP_MODE=prod`
+the backend refuses to start without `ADMIN_PASSWORD`, `ALLOWED_EMAIL_DOMAINS`,
+a non-default `COOKIE_SECRET`, or the SMTP values when `EMAIL_MODE=smtp`.
 
 If adding frontend build-time config, use only public client-visible prefixes:
 

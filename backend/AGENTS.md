@@ -16,11 +16,15 @@
   permissions.
 - Hidden backend agent commands:
   - `make aback`, `make aback-once`, `make astop`
-  - `make alogin USER=user PASS=user`
+  - `make alogin USER=user PASS=userpass1`
   - `make apost API_PATH=/api/... BODY='{}'`
   - `make ahealth`, `make asql SQL='select ...'`, `make adb-path`
 - Hidden backend agent runtime reads `.agent.env` and always uses a copied DB under `.agent/` instead of the student DB directly.
 - Do not introduce ORM, DI, pydantic, or generic service layers.
+- Change karma only with `backend/db/karma.py::change_karma` inside `async with app["karma_lock"]`; commit the karma change in
+  the same transaction as the row that caused it (wager, spin, vote).
+- Send emails only with `backend/mail/sender.py::send_email`. In `EMAIL_MODE=log` emails go to the log and the
+  dev-only `/api/dev/outbox`, which e2e tests read.
 - Add backend tests for each new endpoint, auth rule, DB branch, and error path that matters.
 - After every change, run `uv run pytest` and make sure all tests pass before calling the task done.
 - Do not skip or delete a failing test — fix the code or update the test to match the new correct behavior.

@@ -3,7 +3,8 @@
 // Copy a config pattern here when you add another small tool-side TS setting.
 {
   "compilerOptions": {
-    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "noEmit": true,
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",

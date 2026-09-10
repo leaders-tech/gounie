@@ -1,60 +1,54 @@
 /*
-This file tests the main app router and route guards.
-Edit this file when top-level routes or auth redirects change.
+This file tests the main app router, header, and route guards.
+Edit this file when top-level routes, navigation, or auth redirects change.
 Copy a test pattern here when you add another route or route guard.
 */
 
 import "@testing-library/jest-dom/vitest";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../pages/DashboardPage", () => ({
-  DashboardPage: () => <h2>Dashboard</h2>,
-}));
 
 vi.mock("../pages/AdminPage", () => ({
   AdminPage: () => <h2>Admin page</h2>,
 }));
 
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+vi.mock("../shared/api", async () => {
+  const actual = await vi.importActual<typeof import("../shared/api")>("../shared/api");
+  return { ...actual, postJson: vi.fn().mockResolvedValue({}) };
+});
+
 import { App } from "./App";
-import { AuthContext } from "./auth";
-import type { User } from "../shared/types";
-
-const userValue: User = {
-  id: 2,
-  username: "user",
-  is_admin: false,
-  created_at: "2026-03-06T10:00:00+00:00",
-  updated_at: "2026-03-06T10:00:00+00:00",
-};
-
-function renderApp(path: string, user: User | null) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AuthContext.Provider
-        value={{
-          user,
-          loading: false,
-          login: vi.fn(),
-          logout: vi.fn(),
-          reloadUser: vi.fn(),
-        }}
-      >
-        <App />
-      </AuthContext.Provider>
-    </MemoryRouter>,
-  );
-}
+import { makeUser, renderWithAuth } from "../shared/testUtils";
 
 describe("App routes", () => {
   it("redirects anonymous users to login", () => {
-    renderApp("/dashboard", null);
+    renderWithAuth(<App />, { user: null, path: "/" });
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Register" })).toBeInTheDocument();
   });
 
-  it("redirects normal users away from admin page", () => {
-    renderApp("/admin", userValue);
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+  it("redirects normal users away from the admin page", () => {
+    renderWithAuth(<App />, { user: makeUser({ username: "alice" }), path: "/admin" });
+    expect(screen.getByRole("heading", { name: "hi, alice 👋" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
+  });
+
+  it("shows the admin link and page for admins", () => {
+    renderWithAuth(<App />, { user: makeUser({ username: "admin", is_admin: true }), path: "/admin" });
+    expect(screen.getByRole("heading", { name: "Admin page" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin" })).toBeInTheDocument();
+  });
+
+  it("shows navigation, nickname, and karma in the header", () => {
+    renderWithAuth(<App />, { user: makeUser({ karma: -12 }), path: "/" });
+    expect(screen.getByTestId("header-karma")).toHaveTextContent("-12 karma");
+    for (const name of ["Friday?", "The Wall", "EPS-bet", "URLs", "Slots", "Account"]) {
+      expect(screen.getByRole("link", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("sends unknown paths to the home page", () => {
+    renderWithAuth(<App />, { user: makeUser({ username: "alice" }), path: "/does-not-exist" });
+    expect(screen.getByRole("heading", { name: "hi, alice 👋" })).toBeInTheDocument();
   });
 });

@@ -24,7 +24,7 @@ AGENT_COOKIE_JAR := $(AGENT_RUNTIME_DIR_ABS)/cookies.txt
 AGENT_BACKEND_PID := $(AGENT_RUNTIME_DIR_ABS)/backend.pid
 AGENT_FRONTEND_PID := $(AGENT_RUNTIME_DIR_ABS)/frontend.pid
 ALOGIN_USER := $(if $(filter command line,$(origin USER)),$(USER),user)
-ALOGIN_PASS := $(if $(filter command line,$(origin PASS)),$(PASS),user)
+ALOGIN_PASS := $(if $(filter command line,$(origin PASS)),$(PASS),userpass1)
 APOST_BODY := $(if $(filter command line,$(origin BODY)),$(BODY),{})
 PY_RUNTIME_DEPS := $(shell python3 -c 'import re, tomllib, pathlib; data = tomllib.loads(pathlib.Path("pyproject.toml").read_text()); print(" ".join(re.match(r"[A-Za-z0-9._-]+", dep).group(0) for dep in data["project"]["dependencies"]))')
 PY_DEV_DEPS := $(shell python3 -c 'import re, tomllib, pathlib; data = tomllib.loads(pathlib.Path("pyproject.toml").read_text()); print(" ".join(re.match(r"[A-Za-z0-9._-]+", dep).group(0) for dep in data["dependency-groups"]["dev"]))')

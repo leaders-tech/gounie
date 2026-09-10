@@ -13,6 +13,7 @@ from backend.config import Settings
 
 
 def configure_logging(settings: Settings) -> None:
+    make_stdout_safe_for_any_text()
     root_logger = logging.getLogger()
     if not root_logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
@@ -22,3 +23,14 @@ def configure_logging(settings: Settings) -> None:
     root_logger.setLevel(logging.INFO if settings.debug_logs else logging.WARNING)
     logging.getLogger("backend").setLevel(logging.INFO if settings.debug_logs else logging.WARNING)
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
+
+
+def make_stdout_safe_for_any_text() -> None:
+    """Windows terminals often can't print emoji (slot reels) or letters like ε.
+
+    Print them as escapes like \\U0001f352 instead of failing the whole log line.
+    """
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except AttributeError, ValueError:
+        pass

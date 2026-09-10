@@ -1,4 +1,13 @@
-# Template PWA Agent Notes
+# gounie Agent Notes
+
+- This repo is **gounie**, a just-for-fun student web app built from the templatePWA template: nickname/password
+  accounts with confirmed school emails (`ALLOWED_EMAIL_DOMAINS`), "Is it Friday yet?", The Wall, EPS-bet, the great url
+  collection, and slots. All features share one karma economy.
+- Every karma change must go through `backend/db/karma.py::change_karma` while holding `app["karma_lock"]`, so the karma floor
+  and the karma_changes log stay correct.
+- Log important actions and errors with the feature logger (`backend.auth`, `backend.email`, `backend.wall`,
+  `backend.bets`, `backend.links`, `backend.slots`, `backend.karma`, `backend.admin`, `backend.jobs`). Never log passwords,
+  tokens, or SMTP secrets.
 
 - The main user of this template is a school student who does not understand the technology deeply yet.
 - Keep the template small and easy to read.
@@ -51,7 +60,7 @@
 - Hidden agent runtime commands:
   - `make aback`, `make aback-once`, `make afront`, `make aopen`, `make astop`, `make aclean`
   - `make abrowser SCRIPT=path/to/scenario.mjs`
-  - `make alogin USER=user PASS=user`
+  - `make alogin USER=user PASS=userpass1`
   - `make apost API_PATH=/api/... BODY='{}'`
   - `make ahealth`, `make asql SQL='select ...'`, `make adb-path`
 - `aback` and `aback-once` must always recreate the hidden agent DB from the normal local DB before startup.
@@ -67,8 +76,10 @@
 - Keep `frontend` on exposed port `8080`, `backend` on exposed port `8081`, backend APIs under `/api/...`, and WebSocket
   under `/ws` unless the routing model is intentionally changed everywhere.
 - Keep runtime Docker images non-root by using `USER` in the final Dockerfile stage, not by adding Compose `user:`.
-- Treat `COOKIE_SECRET` in `.docker.env.example` as a local placeholder only; real production secrets belong in the
-  tlfpaas Secrets UI and require `Redeploy now`.
+- Treat `COOKIE_SECRET`, `ADMIN_PASSWORD`, `SMTP_USER`, and `SMTP_PASSWORD` in `.docker.env.example` as local
+  placeholders only; real production secrets belong in the tlfpaas Secrets UI and require `Redeploy now`.
+- The admin account `admin` is created on first start from `ADMIN_PASSWORD` and is never overwritten later. Never
+  hardcode an admin password.
 - Before changing Docker artefacts, read `docs/tlfpaas-autodeploy.md`.
 - Keep LAN dev mode intentionally simple: prefer the explicit macOS Wi-Fi `en0` helper over generic network auto-detection.
 - Keep LAN ports separate from the default localhost ports unless the user asks otherwise.

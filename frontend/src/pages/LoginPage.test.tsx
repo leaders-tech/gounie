@@ -1,78 +1,71 @@
 /*
-This file tests the login page form and login-page redirect behavior.
+This file tests the login page form, the resend-confirmation button, and login-page redirects.
 Edit this file when login form behavior or login-page routing changes.
 Copy a test pattern here when you add tests for another page with a form.
 */
 
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { postJson } = vi.hoisted(() => ({ postJson: vi.fn() }));
+
+vi.mock("../shared/api", async () => {
+  const actual = await vi.importActual<typeof import("../shared/api")>("../shared/api");
+  return { ...actual, postJson };
+});
+
 import { LoginPage } from "./LoginPage";
-import { AuthContext } from "../app/auth";
-import type { User } from "../shared/types";
-
-const anonymousValue = {
-  user: null,
-  loading: false,
-  login: vi.fn().mockResolvedValue(undefined),
-  logout: vi.fn(),
-  reloadUser: vi.fn(),
-};
-
-const adminUser: User = {
-  id: 1,
-  username: "admin",
-  is_admin: true,
-  created_at: "2026-03-06T10:00:00+00:00",
-  updated_at: "2026-03-06T10:00:00+00:00",
-};
+import { ApiError } from "../shared/api";
+import { makeUser, renderWithAuth } from "../shared/testUtils";
 
 describe("LoginPage", () => {
-  it("starts with empty username and password fields", () => {
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={anonymousValue}>
-          <LoginPage />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+  beforeEach(() => {
+    postJson.mockReset();
+  });
 
-    expect(screen.getByLabelText("Username")).toHaveValue("");
+  it("starts with empty nickname and password fields", () => {
+    renderWithAuth(<LoginPage />, { user: null });
+    expect(screen.getByLabelText("Nickname")).toHaveValue("");
     expect(screen.getByLabelText("Password")).toHaveValue("");
   });
 
-  it("submits username and password through auth context", async () => {
-    const login = vi.fn().mockResolvedValue(undefined);
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ ...anonymousValue, login }}>
-          <LoginPage />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
-
-    const usernameInput = screen.getByLabelText("Username");
-    const passwordInput = screen.getByLabelText("Password");
-    await userEvent.clear(usernameInput);
-    await userEvent.type(usernameInput, "admin");
-    await userEvent.clear(passwordInput);
-    await userEvent.type(passwordInput, "admin");
+  it("submits nickname and password through auth context", async () => {
+    const { auth } = renderWithAuth(<LoginPage />, { user: null });
+    await userEvent.type(screen.getByLabelText("Nickname"), "alice");
+    await userEvent.type(screen.getByLabelText("Password"), "password1");
     await userEvent.click(screen.getByRole("button", { name: "Login" }));
-
-    expect(login).toHaveBeenCalledWith("admin", "admin");
+    expect(auth.login).toHaveBeenCalledWith("alice", "password1");
   });
 
-  it("redirects logged-in users away from login page", () => {
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ ...anonymousValue, user: adminUser }}>
-          <LoginPage />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+  it("offers to resend the confirmation email when the email is not confirmed", async () => {
+    const { auth } = renderWithAuth(<LoginPage />, { user: null });
+    auth.login.mockRejectedValue(new ApiError(403, "email_not_confirmed", "Please confirm your email first. Check your inbox."));
+    postJson.mockResolvedValue({ sent: true });
 
-    expect(screen.queryByText("Login")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Nickname"), "alice");
+    await userEvent.type(screen.getByLabelText("Password"), "password1");
+    await userEvent.click(screen.getByRole("button", { name: "Login" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Please confirm your email first.");
+    await userEvent.click(screen.getByRole("button", { name: "Resend confirmation email" }));
+    expect(postJson).toHaveBeenCalledWith("/auth/resend-confirmation", { username: "alice" });
+    expect(await screen.findByRole("status")).toHaveTextContent("We sent you a new confirmation email.");
+  });
+
+  it("does not offer resend for a wrong password", async () => {
+    const { auth } = renderWithAuth(<LoginPage />, { user: null });
+    auth.login.mockRejectedValue(new ApiError(401, "invalid_credentials", "Wrong nickname or password."));
+    await userEvent.type(screen.getByLabelText("Nickname"), "alice");
+    await userEvent.type(screen.getByLabelText("Password"), "nope");
+    await userEvent.click(screen.getByRole("button", { name: "Login" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Wrong nickname or password.");
+    expect(screen.queryByRole("button", { name: "Resend confirmation email" })).not.toBeInTheDocument();
+  });
+
+  it("redirects logged-in users away from the login page", () => {
+    renderWithAuth(<LoginPage />, { user: makeUser() });
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
   });
 });

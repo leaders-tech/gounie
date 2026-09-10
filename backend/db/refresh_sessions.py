@@ -61,6 +61,11 @@ async def delete_session(db: aiosqlite.Connection, session_id: str) -> None:
     await db.commit()
 
 
+async def delete_user_sessions(db: aiosqlite.Connection, user_id: int) -> None:
+    await db.execute("DELETE FROM refresh_sessions WHERE user_id = ?", (user_id,))
+    await db.commit()
+
+
 async def count_sessions(db: aiosqlite.Connection) -> int:
     cursor = await db.execute("SELECT COUNT(*) AS count FROM refresh_sessions")
     row = await cursor.fetchone()

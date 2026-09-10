@@ -1,5 +1,5 @@
 /*
-This file keeps the shared frontend CSS and small global style choices.
+This file keeps the shared frontend CSS: colors, the paper background, the cork board, and slot reel animation.
 Edit this file when global colors, fonts, or page-wide CSS rules change.
 Copy a style pattern here when you add another shared global style block.
 */
@@ -7,27 +7,69 @@ Copy a style pattern here when you add another shared global style block.
 @import "tailwindcss";
 
 :root {
-  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
-  color: #0f172a;
-  background: radial-gradient(circle at top, rgba(111, 168, 255, 0.22), transparent 36%), linear-gradient(180deg, #eff6ff 0%, #f8fafc 52%, #e2e8f0 100%);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: #1c1917;
+  background-color: #fbf5e9;
+  background-image: radial-gradient(rgba(120, 90, 50, 0.14) 1px, transparent 1px);
+  background-size: 18px 18px;
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
+/* Base rules stay in the base layer, so Tailwind classes like text-3xl or text-amber-50 can still override them. */
+@layer base {
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
-#root {
-  min-height: 100vh;
+.cork-board {
+  background-color: #b98b5e;
+  background-image: radial-gradient(rgba(60, 35, 10, 0.28) 1px, transparent 1.5px), radial-gradient(rgba(255, 240, 210, 0.22) 1px, transparent 1.5px);
+  background-size:
+    14px 14px,
+    22px 22px;
+  background-position:
+    0 0,
+    7px 11px;
 }
 
-a {
-  color: inherit;
+@keyframes reel-shake {
+  from {
+    transform: translateY(-10%);
+  }
+  to {
+    transform: translateY(10%);
+  }
 }
 
-button,
-input,
-textarea {
-  font: inherit;
+.reel-spinning {
+  animation: reel-shake 0.08s linear infinite alternate;
+  filter: blur(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-spinning {
+    animation: none;
+    filter: none;
+  }
 }

@@ -17,6 +17,7 @@ frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
 frontend/.vite/
+frontend/*.tsbuildinfo
 scripts/__pycache__/
 *.sqlite3
 *.sqlite3-shm

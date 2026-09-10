@@ -1,6 +1,6 @@
-"""Create and read signed access tokens and hashed refresh-token helpers.
+"""Create and read signed access tokens, refresh-token hashes, and email-link tokens.
 
-Edit this file when token payloads, signatures, or refresh-token hashing changes.
+Edit this file when token payloads, signatures, or token hashing changes.
 Copy the helper style here when you add another small token utility.
 """
 
@@ -17,7 +17,7 @@ from backend.config import Settings
 
 
 def _serializer(settings: Settings) -> URLSafeSerializer:
-    return URLSafeSerializer(settings.cookie_secret, salt="template-access-cookie")
+    return URLSafeSerializer(settings.cookie_secret, salt="gounie-access-cookie")
 
 
 def build_access_token(settings: Settings, user: dict[str, Any]) -> str:
@@ -54,3 +54,11 @@ def create_refresh_token_pair() -> tuple[str, str]:
 
 def hash_refresh_token(settings: Settings, raw_token: str) -> str:
     return hmac.digest(settings.cookie_secret.encode("utf-8"), raw_token.encode("utf-8"), "sha256").hex()
+
+
+def create_email_link_token() -> str:
+    return token_urlsafe(32)
+
+
+def hash_email_link_token(settings: Settings, raw_token: str) -> str:
+    return hmac.digest(settings.cookie_secret.encode("utf-8"), f"email:{raw_token}".encode("utf-8"), "sha256").hex()

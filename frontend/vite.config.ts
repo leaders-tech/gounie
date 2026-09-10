@@ -34,12 +34,15 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: "autoUpdate",
+        workbox: {
+          navigateFallbackDenylist: [/^\/api\//, /^\/ws/],
+        },
         manifest: {
-          name: "Template PWA",
-          short_name: "TemplatePWA",
-          description: "Small starter app for school projects.",
-          theme_color: "#0e1a2b",
-          background_color: "#eff6ff",
+          name: "gounie",
+          short_name: "gounie",
+          description: "Silly pages for fellow students: Friday check, walls, bets, links, and slots.",
+          theme_color: "#facc15",
+          background_color: "#fbf5e9",
           display: "standalone",
           start_url: "/",
           icons: [
@@ -78,6 +81,7 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: "jsdom",
       setupFiles: "./vitest.setup.ts",
+      testTimeout: 20_000,
       exclude: ["tests/e2e/**", "node_modules/**", "dist/**"],
     },
   };

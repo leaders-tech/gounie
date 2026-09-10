@@ -1,10 +1,10 @@
 /*
-This file keeps the frontend auth state, login helpers, and session loading logic.
-Edit this file when login, logout, refresh, or current-user browser behavior changes.
+This file keeps the frontend auth state, login helpers, karma updates, and session loading logic.
+Edit this file when login, logout, refresh, current-user, or header karma behavior changes.
 Copy the provider and hook pattern here when you add another small shared frontend context.
 */
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, postJson } from "../shared/api";
 import type { User } from "../shared/types";
 
@@ -14,6 +14,7 @@ type AuthContextValue = {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   reloadUser: () => Promise<void>;
+  setKarma: (karma: number) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -48,7 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     didLoadSession.current = true;
     loadCurrentUser()
       .then(setUser)
+      .catch(() => setUser(null))
       .finally(() => setLoading(false));
+  }, []);
+
+  const setKarma = useCallback((karma: number) => {
+    setUser((current) => (current ? { ...current, karma } : current));
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -66,8 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async reloadUser() {
         setUser(await loadCurrentUser());
       },
+      setKarma,
     }),
-    [loading, user],
+    [loading, user, setKarma],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

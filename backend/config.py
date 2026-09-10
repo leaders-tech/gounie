@@ -1,6 +1,6 @@
 """Load backend settings from .env and keep them in one Settings object.
 
-Edit this file when env variables, ports, cookie names, or dev/prod defaults change.
+Edit this file when env variables, ports, cookie names, email settings, karma rules, or dev/prod defaults change.
 Do not copy this file. Change it when the app configuration model changes.
 """
 
@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_COOKIE_SECRET = "change-this-secret"
+EMAIL_MODES = {"log", "smtp"}
 
 
 @dataclass(slots=True)
@@ -27,8 +28,17 @@ class Settings:
     cookie_secret: str
     frontend_origin: str
     debug_logs: bool = True
-    access_cookie_name: str = "template_access"
-    refresh_cookie_name: str = "template_refresh"
+    admin_password: str = ""
+    allowed_email_domains: tuple[str, ...] = ("example.edu",)
+    email_mode: str = "log"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = ""
+    karma_floor: int = -50
+    access_cookie_name: str = "gounie_access"
+    refresh_cookie_name: str = "gounie_refresh"
     access_ttl_seconds: int = 2 * 60 * 60
     refresh_ttl_seconds: int = 60 * 24 * 60 * 60
 
@@ -74,6 +84,15 @@ def load_settings() -> Settings:
         cookie_secret=cookie_secret,
         frontend_origin=frontend_origin,
         debug_logs=debug_logs,
+        admin_password=os.getenv("ADMIN_PASSWORD", ""),
+        allowed_email_domains=parse_domains(os.getenv("ALLOWED_EMAIL_DOMAINS", "")),
+        email_mode=os.getenv("EMAIL_MODE", "log").strip().lower() or "log",
+        smtp_host=os.getenv("SMTP_HOST", "").strip(),
+        smtp_port=int(os.getenv("SMTP_PORT", "").strip() or "587"),
+        smtp_user=os.getenv("SMTP_USER", "").strip(),
+        smtp_password=os.getenv("SMTP_PASSWORD", ""),
+        email_from=os.getenv("EMAIL_FROM", "").strip(),
+        karma_floor=int(os.getenv("KARMA_FLOOR", "").strip() or "-50"),
     )
     validate_settings(settings)
     return settings
@@ -90,6 +109,33 @@ def parse_bool_env(value: str | None, *, default: bool) -> bool:
     raise ValueError(f"Expected a boolean env value, got {value!r}. Use 1 or 0.")
 
 
+def parse_domains(value: str) -> tuple[str, ...]:
+    domains = []
+    for part in value.split(","):
+        domain = part.strip().lower().lstrip("@")
+        if domain and domain not in domains:
+            domains.append(domain)
+    return tuple(domains)
+
+
 def validate_settings(settings: Settings) -> None:
     if settings.mode == "prod" and settings.cookie_secret == DEFAULT_COOKIE_SECRET:
         raise ValueError("Refusing to start in prod with the default COOKIE_SECRET. Set a real secret in .env or your deploy env.")
+    if settings.mode == "prod" and not settings.admin_password:
+        raise ValueError("Refusing to start in prod without ADMIN_PASSWORD. Set it in the tlfpaas Secrets UI or your deploy env.")
+    if not settings.allowed_email_domains:
+        raise ValueError("ALLOWED_EMAIL_DOMAINS is empty. Set a comma-separated list like school.edu,uni.edu.")
+    if settings.email_mode not in EMAIL_MODES:
+        raise ValueError(f"EMAIL_MODE must be log or smtp, got {settings.email_mode!r}.")
+    if settings.email_mode == "smtp":
+        required = {
+            "SMTP_HOST": settings.smtp_host,
+            "SMTP_USER": settings.smtp_user,
+            "SMTP_PASSWORD": settings.smtp_password,
+            "EMAIL_FROM": settings.email_from,
+        }
+        missing = [name for name, value in required.items() if not value]
+        if missing:
+            raise ValueError(f"EMAIL_MODE=smtp needs these settings: {', '.join(missing)}.")
+    if settings.karma_floor > 0:
+        raise ValueError("KARMA_FLOOR must be 0 or a negative number.")

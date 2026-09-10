@@ -1,5 +1,5 @@
 /*
-This file starts the React app and wraps it with the router and auth provider.
+This file starts the React app and wraps it with the router, auth provider, and live websocket provider.
 Edit this file when app-wide providers or startup behavior changes.
 Do not copy this file. Change it when the whole frontend app bootstrap changes.
 */
@@ -9,6 +9,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./app/App";
 import { AuthProvider } from "./app/auth";
+import { LiveProvider } from "./shared/live";
 import "./index.css";
 
 if ("serviceWorker" in navigator) {
@@ -19,7 +20,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <LiveProvider>
+          <App />
+        </LiveProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,

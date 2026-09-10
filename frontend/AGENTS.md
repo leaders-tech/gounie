@@ -39,9 +39,10 @@
 
 ## Real-time updates (WebSocket)
 
-- WebSocket connection logic lives in `src/shared/socket.ts`.
-- The socket connects after login and disconnects on logout — do not manage the connection manually.
-- To react to live server events, add a `useEffect` listener in the component that needs live data.
+- WebSocket connection logic lives in `src/shared/socket.ts`. `LiveProvider` in `src/shared/live.tsx` opens one socket
+  after login and closes it on logout — do not manage the connection manually.
+- To react to live server events, call `useLiveEvent(handler)` from `src/shared/live.tsx` in the component that needs
+  live data. `karma.changed` already updates the header karma through `useAuth().setKarma`.
 - Check the browser console for WebSocket errors after any auth or routing change.
 
 ## Tests — always keep them green
@@ -50,7 +51,7 @@
   Run: `cd frontend && npm test`
 - End-to-end tests use Playwright and live in `frontend/tests/e2e/`.
   Run: `cd frontend && npm run test:e2e`
-- Every new page needs at least one unit test.
+- Every new page needs at least one unit test. Use `renderWithAuth` and `answerByPath` from `src/shared/testUtils.tsx`.
 - Every new user flow (login, save a note, etc.) needs an e2e test.
 - **Always run `npm test` before calling a task done. Fix broken tests before moving on.**
 - Do not delete a test just to make the suite pass — update it to match the new correct behavior.

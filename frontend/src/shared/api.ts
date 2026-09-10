@@ -1,5 +1,5 @@
 /*
-This file sends frontend JSON requests to the backend and builds the websocket base URL.
+This file sends frontend JSON requests to the backend and builds API and websocket URLs.
 Edit this file when API path rules, websocket URL rules, shared fetch behavior, or API error parsing changes.
 Copy the helper pattern here when you add another shared browser API helper.
 */
@@ -28,6 +28,11 @@ function getApiBasePath(): string {
 
 const apiBasePath = getApiBasePath();
 
+export function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${apiBasePath}${normalizedPath}`;
+}
+
 async function readApiPayload<T>(response: Response): Promise<ApiResponse<T>> {
   const text = await response.text();
   if (!text) {
@@ -42,8 +47,7 @@ async function readApiPayload<T>(response: Response): Promise<ApiResponse<T>> {
 }
 
 export async function postJson<T>(path: string, body: unknown = {}): Promise<T> {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const response = await fetch(`${apiBasePath}${normalizedPath}`, {
+  const response = await fetch(apiUrl(path), {
     method: "POST",
     credentials: "include",
     headers: {
@@ -57,6 +61,10 @@ export async function postJson<T>(path: string, body: unknown = {}): Promise<T> 
     throw new ApiError(response.status, payload.error.code, payload.error.message);
   }
   return payload.data;
+}
+
+export function errorMessage(error: unknown, fallback = "Something went wrong."): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 export function getWsUrl(): string {
