@@ -48,5 +48,6 @@ export async function loginInBrowser(page: Page, user: { username: string; passw
   await page.getByLabel("Nickname").fill(user.username);
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Login" }).click();
-  await expect(page.getByRole("heading", { name: `hi, ${user.username} 👋` })).toBeVisible();
+  // Logging in hashes the password, which can be slow when several browsers log in at the same time.
+  await expect(page.getByRole("heading", { name: `hi, ${user.username} 👋` })).toBeVisible({ timeout: 20000 });
 }

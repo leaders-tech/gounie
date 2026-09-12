@@ -2,11 +2,13 @@
 
 gounie is a small, silly web app for fellow students. You sign up with a **nickname**, a **password**, and a **school email** (only allowed email domains work, and the email must be confirmed).
 
+Visitors without an account can read **Is it Friday yet?**, **EPS-bet**, and **the great url collection**. Betting, adding or voting on links, walls, and slots need an account. The home page shows a login form to visitors.
+
 | Page                         | What it does                                                                                                                                                            |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Is it Friday yet?**        | A huge red **NO**. On Fridays (your own clock): **YES!** and confetti. That's it.                                                                                       |
 | **The Wall**                 | Everybody has a wall. Anyone can stick notes or pictures on it. Pick the note color and text color on a color circle, make the text regular, bold, italic, underlined, or strikethrough, and turn the note to any angle (360°). The page claims everything is editable and deletable, but after posting only the rotation can change (right-click → Edit, or ✏️), and Delete never works: _whoops.. something went wrong_. |
-| **EPS-bet**                    | Bet karma on what will happen. Pick YES or NO. Right = 2× your stake back. Every bet has a discussion.                                                                    |
+| **EPS-bet**                    | Bet karma on what will happen. Pick YES or NO. Right = 2× your stake back. Every bet has a discussion. New bets are published only after the admin approves them.         |
 | **the great url collection** | A big bank of useful links. Search, add, edit, delete your own. Votes give the author +1 / -1 karma.                                                                      |
 | **slots**                    | Gamble your karma. The page never shows the odds; players have to find out for themselves (see Karma rules).                                                                |
 
@@ -21,7 +23,7 @@ It was built from the `templatePWA` teaching template:
 ## Karma rules
 
 - Everyone starts with **0 karma**.
-- **EPS-bet**: your stake is taken when you bet. If your side wins, you get **2×** back. If not, nothing. One bet per person per question, no changes. The creator can't bet on their own question and must reveal the outcome after the deadline. If they don't reveal it within **7 days** after the deadline, everyone gets their stake back. The admin can reveal or cancel any bet.
+- **EPS-bet**: a new bet is not live right away. It waits on the admin page until the admin approves or declines it, and the person who proposed it gets an email either way. Only approved bets can be seen, bet on, or discussed. Then: your stake is taken when you bet. If your side wins, you get **2×** back. If not, nothing. One bet per person per question, no changes — the creator can bet on their own question too. The creator must reveal the outcome after the deadline. If they don't reveal it within **7 days** after the deadline, everyone gets their stake back. The admin can reveal or cancel any bet.
 - **slots**: the stake is taken, the pay table decides the payout. Average payback is exactly 10%.
 - **URL votes**: an upvote gives the link author +1 karma, a downvote -1. You can change or remove your vote. You can't vote on your own links.
 - **Karma floor**: bets and spins can't take your karma below `KARMA_FLOOR` (default **-50**). Downvotes can.

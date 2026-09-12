@@ -14,7 +14,7 @@ from backend.db.bets import get_bet
 from backend.db.karma import change_karma, get_karma
 from backend.games.betting import settle_bet
 from backend.jobs import recover_negative_karma, refund_abandoned_bets
-from backend.tests.conftest import api, login_as
+from backend.tests.conftest import api, approve_bet, login_as
 
 
 def hours_ago(hours: float) -> str:
@@ -33,10 +33,13 @@ async def set_risk_hours_ago(db, user_id: int, hours: float) -> None:
 
 
 async def make_bet(client, cookies, days_from_now: float = 0.1) -> int:
+    """Create a bet and approve it right away: only live bets can be wagered on or refunded."""
     deadline = (datetime.now(tz=UTC) + timedelta(days=days_from_now)).isoformat()
     status, payload = await api(client, "/api/bets/create", {"title": "Will it rain?", "deadline_at": deadline}, cookies)
     assert status == 200, payload
-    return payload["data"]["bet"]["id"]
+    bet_id = int(payload["data"]["bet"]["id"])
+    await approve_bet(client, bet_id)
+    return bet_id
 
 
 @pytest.mark.asyncio

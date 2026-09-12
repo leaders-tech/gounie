@@ -1,6 +1,6 @@
 /*
-This file tests the admin page: user list, setting karma, banning, and karma history.
-Edit this file when admin user tools change.
+This file tests the admin page: the bets waiting for approval, the user list, setting karma, banning, and karma history.
+Edit this file when admin user tools or the bet approval queue change.
 Copy a test pattern here when you add tests for another admin page.
 */
 
@@ -17,7 +17,7 @@ vi.mock("../shared/api", async () => {
 });
 
 import { AdminPage } from "./AdminPage";
-import { answerByPath, makeUser, renderWithAuth } from "../shared/testUtils";
+import { answerByPath, makeBet, makeUser, renderWithAuth } from "../shared/testUtils";
 import type { AdminUser } from "../shared/types";
 
 const CREATED = "2026-09-01T10:00:00+00:00";
@@ -36,6 +36,9 @@ describe("AdminPage", () => {
     postJson.mockReset();
     answerByPath(postJson, {
       "/admin/users/list": () => ({ users }),
+      "/admin/bets/pending": () => ({ bets: [makeBet({ id: 8, title: "Will it snow?", creator_username: "alice", approval: "pending" })] }),
+      "/admin/bets/approve": () => ({ bet_id: 8, approval: "approved", email_sent: true }),
+      "/admin/bets/decline": () => ({ bet_id: 8, approval: "declined", email_sent: true }),
       "/admin/users/set-karma": () => ({ user_id: 2, karma: 10 }),
       "/admin/users/ban": () => ({ user_id: 2, banned: true }),
       "/admin/users/karma-history": () => ({
@@ -62,6 +65,26 @@ describe("AdminPage", () => {
 
     await userEvent.click(row.getByRole("button", { name: "Ban" }));
     expect(postJson).toHaveBeenCalledWith("/admin/users/ban", { user_id: 2, banned: true });
+  });
+
+  it("approves a waiting bet with a note for the creator", async () => {
+    renderWithAuth(<AdminPage />, { user: makeUser({ is_admin: true }) });
+
+    expect(await screen.findByRole("heading", { name: "Bets waiting for approval (1)" })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Note for the creator (optional)"), "Nice one");
+    await userEvent.click(screen.getByRole("button", { name: "Approve and publish" }));
+
+    expect(postJson).toHaveBeenCalledWith("/admin/bets/approve", { bet_id: 8, note: "Nice one" });
+    expect(await screen.findByRole("status")).toHaveTextContent('"Will it snow?" was approved and published. @alice got an email.');
+  });
+
+  it("declines a waiting bet", async () => {
+    renderWithAuth(<AdminPage />, { user: makeUser({ is_admin: true }) });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Decline" }));
+
+    expect(postJson).toHaveBeenCalledWith("/admin/bets/decline", { bet_id: 8, note: "" });
+    expect(await screen.findByRole("status")).toHaveTextContent("was declined");
   });
 
   it("shows the karma history of a user", async () => {

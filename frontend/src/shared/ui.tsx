@@ -19,7 +19,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   return <div className={`rounded-2xl border-2 border-stone-900 bg-white p-6 shadow-[5px_5px_0_#1c1917] ${className}`}>{children}</div>;
 }
 
-export function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+export function PageTitle({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
   return (
     <div className="mb-6">
       <h1 className="text-4xl font-black tracking-tight">{title}</h1>

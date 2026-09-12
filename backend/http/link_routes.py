@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from aiohttp import web
 
-from backend.auth.access import require_active_user, require_user
+from backend.auth.access import current_user, require_active_user
 from backend.db.links import create_link, delete_link, get_link, get_link_vote, list_links, save_link_vote, update_link
 from backend.db.karma import change_karma
 from backend.http.fields import read_id, read_int, read_text
@@ -43,10 +43,12 @@ async def load_own_link(request: web.Request, link_id: int, user: dict[str, Any]
 
 
 async def links_list(request: web.Request) -> web.Response:
-    user = require_user(request)
+    """Anyone can read the links, also without an account. Visitors just have no votes of their own."""
+    user = current_user(request)
     payload = await read_json(request)
     query = read_text(payload, "query", label="Search", max_length=200)
-    return ok({"links": await list_links(request.app["db"], user["id"], query)})
+    viewer_id = user["id"] if user else 0
+    return ok({"links": await list_links(request.app["db"], viewer_id, query)})
 
 
 async def links_create(request: web.Request) -> web.Response:

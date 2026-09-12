@@ -7,6 +7,7 @@ Copy this file as a starting point when you add another list page with a create 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BetStatusBadge, betPhase, PoolBar } from "../features/bets/betParts";
+import { useAuth } from "../app/auth";
 import { errorMessage, postJson } from "../shared/api";
 import { formatDateTime } from "../shared/format";
 import { useLiveEvent } from "../shared/live";
@@ -58,7 +59,8 @@ function NewBetForm({ onCreated }: { onCreated: (bet: Bet) => void }) {
         <TextArea label="Details (optional)" maxLength={2000} onChange={(event) => setDescription(event.target.value)} rows={3} value={description} />
         <TextField label="Betting closes at" onChange={(event) => setDeadline(event.target.value)} type="datetime-local" value={deadline} />
         <p className="text-xs text-stone-600">
-          You can't bet on your own question. After betting closes, you must reveal the outcome. If you don't within 7 days, everyone gets their karma back.
+          An admin reads every new bet first. You get an email when your bet is approved or not, and only approved bets go live. After betting closes, you must
+          reveal the outcome yourself. If you don't within 7 days, everyone gets their karma back.
         </p>
         <ErrorText>{error}</ErrorText>
         <Button disabled={busy} type="submit">
@@ -94,6 +96,7 @@ function BetCard({ bet }: { bet: Bet }) {
 
 export function BetsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [bets, setBets] = useState<Bet[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -122,6 +125,8 @@ export function BetsPage() {
   });
 
   const groups = [
+    { key: "review", title: "Your bets waiting for the admin", items: bets.filter((bet) => betPhase(bet) === "review") },
+    { key: "declined", title: "Your bets that were not approved", items: bets.filter((bet) => betPhase(bet) === "declined") },
     { key: "betting", title: "Open for bets", items: bets.filter((bet) => betPhase(bet) === "betting") },
     { key: "waiting", title: "Waiting for the outcome", items: bets.filter((bet) => betPhase(bet) === "waiting") },
     { key: "closed", title: "Closed", items: bets.filter((bet) => betPhase(bet) === "closed") },
@@ -129,11 +134,32 @@ export function BetsPage() {
 
   return (
     <section className="space-y-8">
-      <PageTitle title="EPS-bet" subtitle="Bet karma on what will happen. If you are right, you get 2× your stake back. If not, it's gone." />
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => setShowForm((current) => !current)}>{showForm ? "Close the form" : "+ New bet"}</Button>
-      </div>
-      {showForm ? <NewBetForm onCreated={(bet) => navigate(`/eps-bet/${bet.id}`)} /> : null}
+      <PageTitle title="EPS-bet" subtitle="Wanna bet? Think something will happen?" />
+      {user ? (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={() => setShowForm((current) => !current)}>{showForm ? "Close the form" : "+ New bet"}</Button>
+          </div>
+          {showForm ? <NewBetForm onCreated={(bet) => navigate(`/eps-bet/${bet.id}`)} /> : null}
+          {user.is_admin ? (
+            <p className="text-sm text-stone-600">
+              New bets wait for you on the{" "}
+              <Link className="font-bold underline" to="/admin">
+                admin page
+              </Link>
+              .
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="rounded-2xl border-2 border-stone-900 bg-white p-4 font-semibold shadow-[3px_3px_0_#1c1917]">
+          You are just looking around.{" "}
+          <Link className="underline" to="/login">
+            Log in
+          </Link>{" "}
+          to place a bet or start your own.
+        </p>
+      )}
       <ErrorText>{error}</ErrorText>
       {loaded && !error && bets.length === 0 ? <p className="text-stone-600">No bets yet. Start the first one!</p> : null}
       {groups.map((group) =>

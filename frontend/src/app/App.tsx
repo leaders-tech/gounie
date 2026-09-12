@@ -24,11 +24,11 @@ import { UserWallPage } from "../pages/UserWallPage";
 import { WallDirectoryPage } from "../pages/WallDirectoryPage";
 
 const NAV_LINKS = [
-  { to: "/friday", label: "Friday?" },
-  { to: "/wall", label: "The Wall" },
-  { to: "/eps-bet", label: "EPS-bet" },
-  { to: "/urls", label: "URLs" },
-  { to: "/slots", label: "Slots" },
+  { to: "/friday", label: "Is it Friday yet?", needsAccount: false },
+  { to: "/wall", label: "The Wall", needsAccount: true },
+  { to: "/eps-bet", label: "EPS-bet", needsAccount: false },
+  { to: "/urls", label: "URLs", needsAccount: false },
+  { to: "/slots", label: "Slots", needsAccount: true },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -37,6 +37,7 @@ function navClass({ isActive }: { isActive: boolean }) {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const navLinks = user ? NAV_LINKS : NAV_LINKS.filter((link) => !link.needsAccount);
 
   return (
     <div className="min-h-screen">
@@ -48,39 +49,37 @@ function Layout({ children }: { children: React.ReactNode }) {
           >
             gounie
           </Link>
+          <nav aria-label="Main" className="flex flex-wrap items-center gap-1 text-sm font-semibold">
+            {navLinks.map((link) => (
+              <NavLink className={navClass} key={link.to} to={link.to}>
+                {link.label}
+              </NavLink>
+            ))}
+            {user?.is_admin ? (
+              <NavLink className={navClass} to="/admin">
+                Admin
+              </NavLink>
+            ) : null}
+          </nav>
           {user ? (
-            <>
-              <nav aria-label="Main" className="flex flex-wrap items-center gap-1 text-sm font-semibold">
-                {NAV_LINKS.map((link) => (
-                  <NavLink className={navClass} key={link.to} to={link.to}>
-                    {link.label}
-                  </NavLink>
-                ))}
-                {user.is_admin && (
-                  <NavLink className={navClass} to="/admin">
-                    Admin
-                  </NavLink>
-                )}
-              </nav>
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Link className="flex items-center gap-2 font-semibold hover:underline" to={`/u/${user.username}`}>
-                  <Avatar size="sm" username={user.username} />
-                  {user.username}
-                </Link>
-                <span
-                  className={`rounded-full border-2 border-stone-900 px-2 py-0.5 font-bold ${user.karma < 0 ? "bg-rose-200" : "bg-lime-200"}`}
-                  data-testid="header-karma"
-                >
-                  {user.karma} karma
-                </span>
-                <NavLink className={navClass} to="/account">
-                  Account
-                </NavLink>
-                <button className="rounded-full bg-stone-900 px-3 py-1.5 font-semibold text-amber-50" onClick={() => void logout()} type="button">
-                  Logout
-                </button>
-              </div>
-            </>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Link className="flex items-center gap-2 font-semibold hover:underline" to={`/u/${user.username}`}>
+                <Avatar size="sm" username={user.username} />
+                {user.username}
+              </Link>
+              <span
+                className={`rounded-full border-2 border-stone-900 px-2 py-0.5 font-bold ${user.karma < 0 ? "bg-rose-200" : "bg-lime-200"}`}
+                data-testid="header-karma"
+              >
+                {user.karma} karma
+              </span>
+              <NavLink className={navClass} to="/account">
+                Account
+              </NavLink>
+              <button className="rounded-full bg-stone-900 px-3 py-1.5 font-semibold text-amber-50" onClick={() => void logout()} type="button">
+                Logout
+              </button>
+            </div>
           ) : (
             <nav className="flex gap-1 text-sm font-semibold">
               <NavLink className={navClass} to="/login">
@@ -136,14 +135,14 @@ export function App() {
         <Route path="/confirm" element={<ConfirmEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset" element={<ResetPasswordPage />} />
-        <Route path="/" element={protectedPage(<HomePage />)} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/friday" element={<FridayPage />} />
+        <Route path="/eps-bet" element={<BetsPage />} />
+        <Route path="/eps-bet/:betId" element={<BetDetailPage />} />
+        <Route path="/urls" element={<LinksPage />} />
         <Route path="/account" element={protectedPage(<AccountPage />)} />
-        <Route path="/friday" element={protectedPage(<FridayPage />)} />
         <Route path="/wall" element={protectedPage(<WallDirectoryPage />)} />
         <Route path="/u/:username" element={protectedPage(<UserWallPage />)} />
-        <Route path="/eps-bet" element={protectedPage(<BetsPage />)} />
-        <Route path="/eps-bet/:betId" element={protectedPage(<BetDetailPage />)} />
-        <Route path="/urls" element={protectedPage(<LinksPage />)} />
         <Route path="/slots" element={protectedPage(<SlotsPage />)} />
         <Route
           path="/admin"

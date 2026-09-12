@@ -104,10 +104,6 @@ export function LinksPage() {
     }
   });
 
-  if (!user) {
-    return null;
-  }
-
   const vote = async (link: LinkItem, value: 1 | -1) => {
     const next = link.my_vote === value ? 0 : value;
     try {
@@ -120,7 +116,7 @@ export function LinksPage() {
 
   const remove = async (link: LinkItem) => {
     try {
-      const path = link.author_id === user.id ? "/links/delete" : "/admin/links/delete";
+      const path = link.author_id === user?.id ? "/links/delete" : "/admin/links/delete";
       await postJson(path, { id: link.id });
       setConfirmDeleteId(null);
       await load(query);
@@ -131,18 +127,29 @@ export function LinksPage() {
 
   return (
     <section className="space-y-6">
-      <PageTitle title="the great url collection" subtitle="Useful links from everyone. Upvote a link: its author gets +1 karma. Downvote it: -1 karma." />
-      <Card>
-        <LinkForm
-          heading="Add a link"
-          onSubmit={async (fields) => {
-            await postJson("/links/create", fields);
-            await load(query);
-          }}
-          resetOnSuccess
-          submitLabel="Add link"
-        />
-      </Card>
+      <PageTitle title="the great url collection" subtitle="Useful links from everyone." />
+      {user ? (
+        <Card>
+          <LinkForm
+            heading="Add a link"
+            onSubmit={async (fields) => {
+              await postJson("/links/create", fields);
+              await load(query);
+            }}
+            resetOnSuccess
+            submitLabel="Add link"
+          />
+        </Card>
+      ) : (
+        <Card>
+          <p className="font-semibold">
+            <Link className="underline" to="/login">
+              Log in
+            </Link>{" "}
+            to add links and to vote.
+          </p>
+        </Card>
+      )}
       <input
         aria-label="Search links"
         className="w-full rounded-xl border-2 border-stone-900 bg-white px-4 py-3 text-lg outline-none focus:ring-4 focus:ring-yellow-300"
@@ -155,7 +162,7 @@ export function LinksPage() {
       {loaded && links.length === 0 ? <p className="text-stone-600">{query ? "No links match your search." : "No links yet. Add the first one!"}</p> : null}
       <ul className="space-y-3">
         {links.map((link) => {
-          const mine = link.author_id === user.id;
+          const mine = user ? link.author_id === user.id : false;
           return (
             <li className="flex gap-4 rounded-2xl border-2 border-stone-900 bg-white p-4 shadow-[3px_3px_0_#1c1917]" data-testid="link-item" key={link.id}>
               <div className="flex flex-col items-center gap-1">
@@ -163,9 +170,9 @@ export function LinksPage() {
                   aria-label={`Upvote ${link.title}`}
                   aria-pressed={link.my_vote === 1}
                   className={`h-8 w-8 rounded-lg border-2 border-stone-900 font-black disabled:opacity-30 ${link.my_vote === 1 ? "bg-lime-300" : "bg-white"}`}
-                  disabled={mine}
+                  disabled={!user || mine}
                   onClick={() => void vote(link, 1)}
-                  title={mine ? "You can't vote on your own link." : "+1 karma for the author"}
+                  title={!user ? "Log in to vote." : mine ? "You can't vote on your own link." : "+1 karma for the author"}
                   type="button"
                 >
                   ▲
@@ -177,9 +184,9 @@ export function LinksPage() {
                   aria-label={`Downvote ${link.title}`}
                   aria-pressed={link.my_vote === -1}
                   className={`h-8 w-8 rounded-lg border-2 border-stone-900 font-black disabled:opacity-30 ${link.my_vote === -1 ? "bg-rose-300" : "bg-white"}`}
-                  disabled={mine}
+                  disabled={!user || mine}
                   onClick={() => void vote(link, -1)}
-                  title={mine ? "You can't vote on your own link." : "-1 karma for the author"}
+                  title={!user ? "Log in to vote." : mine ? "You can't vote on your own link." : "-1 karma for the author"}
                   type="button"
                 >
                   ▼
@@ -216,7 +223,7 @@ export function LinksPage() {
                       </Link>{" "}
                       · {formatDate(link.created_at)}
                     </p>
-                    {mine || user.is_admin ? (
+                    {mine || user?.is_admin ? (
                       <div className="mt-3 flex flex-wrap gap-2 text-sm">
                         {mine ? (
                           <Button onClick={() => setEditingId(link.id)} variant="secondary">

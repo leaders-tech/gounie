@@ -145,3 +145,19 @@ async def test_admin_can_delete_any_link(client, people) -> None:
     assert (await api(client, "/api/admin/links/delete", {"id": link["id"]}, cookies["bob"]))[0] == 403
     assert (await api(client, "/api/admin/links/delete", {"id": link["id"]}, admin))[0] == 200
     assert await search(client, cookies["bob"], "") == []
+
+
+@pytest.mark.asyncio
+async def test_visitors_can_read_links_but_not_add_or_vote(client, people) -> None:
+    _, cookies = people
+    link = await add_link(client, cookies["alice"])
+
+    status, payload = await api(client, "/api/links/list", {"query": ""})
+    assert status == 200
+    assert [item["title"] for item in payload["data"]["links"]] == [link["title"]]
+    assert payload["data"]["links"][0]["my_vote"] == 0
+
+    assert (await api(client, "/api/links/create", {"url": "https://example.org/", "title": "Nope"}))[0] == 401
+    assert (await api(client, "/api/links/vote", {"link_id": link["id"], "value": 1}))[0] == 401
+    assert (await api(client, "/api/links/update", {"id": link["id"], "url": "https://example.org/", "title": "Nope"}))[0] == 401
+    assert (await api(client, "/api/links/delete", {"id": link["id"]}))[0] == 401

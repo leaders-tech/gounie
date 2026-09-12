@@ -1,6 +1,6 @@
 /*
-This file shows the admin-only page: all users with email, status, karma editing, bans, and karma history.
-Edit this file when admin user tools change. Other admin tools live on the wall, bet, and links pages.
+This file shows the admin-only page: the bets waiting for approval and all users with email, status, karma editing, bans, and karma history.
+Edit this file when admin user tools or the bet approval queue change. Other admin tools live on the wall, bet, and links pages.
 Copy this file as a starting point when you add another admin-only page.
 */
 
@@ -9,8 +9,9 @@ import { Link } from "react-router-dom";
 import { errorMessage, postJson } from "../shared/api";
 import { Avatar } from "../shared/Avatar";
 import { formatDateTime, signed } from "../shared/format";
-import type { AdminUser, KarmaChange } from "../shared/types";
-import { Button, Card, ErrorText, InfoText, PageTitle } from "../shared/ui";
+import { useLiveEvent } from "../shared/live";
+import type { AdminUser, Bet, KarmaChange } from "../shared/types";
+import { Button, Card, ErrorText, InfoText, PageTitle, TextArea } from "../shared/ui";
 
 function StatusBadges({ person }: { person: AdminUser }) {
   const badges = [];
@@ -29,8 +30,48 @@ function StatusBadges({ person }: { person: AdminUser }) {
   );
 }
 
+function PendingBets({ bets, onReview }: { bets: Bet[]; onReview: (bet: Bet, approve: boolean, note: string) => Promise<void> }) {
+  const [notes, setNotes] = useState<Record<number, string>>({});
+
+  return (
+    <Card className="space-y-4 bg-amber-100">
+      <h2 className="text-xl font-black">Bets waiting for approval ({bets.length})</h2>
+      {bets.length === 0 ? <p className="text-stone-700">Nothing to check right now.</p> : null}
+      <ul className="space-y-4">
+        {bets.map((bet) => (
+          <li className="rounded-2xl border-2 border-stone-900 bg-white p-4" key={bet.id}>
+            <Link className="text-lg font-bold hover:underline" to={`/eps-bet/${bet.id}`}>
+              {bet.title}
+            </Link>
+            <p className="mt-1 text-sm text-stone-600">
+              by @{bet.creator_username} · betting would close {formatDateTime(bet.deadline_at)}
+            </p>
+            {bet.description ? <p className="mt-2 whitespace-pre-wrap break-words">{bet.description}</p> : null}
+            <div className="mt-3 space-y-3">
+              <TextArea
+                label="Note for the creator (optional)"
+                maxLength={500}
+                onChange={(event) => setNotes((current) => ({ ...current, [bet.id]: event.target.value }))}
+                rows={2}
+                value={notes[bet.id] ?? ""}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void onReview(bet, true, notes[bet.id] ?? "")}>Approve and publish</Button>
+                <Button onClick={() => void onReview(bet, false, notes[bet.id] ?? "")} variant="danger">
+                  Decline
+                </Button>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [pendingBets, setPendingBets] = useState<Bet[]>([]);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [karmaDrafts, setRepDrafts] = useState<Record<number, string>>({});
@@ -45,9 +86,25 @@ export function AdminPage() {
     }
   }, []);
 
+  const loadPendingBets = useCallback(async () => {
+    try {
+      const data = await postJson<{ bets: Bet[] }>("/admin/bets/pending");
+      setPendingBets(data.bets);
+    } catch (loadError) {
+      setError(errorMessage(loadError, "Could not load the bets waiting for approval."));
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadPendingBets();
+  }, [load, loadPendingBets]);
+
+  useLiveEvent((message) => {
+    if (message.type === "bet.changed") {
+      void loadPendingBets();
+    }
+  });
 
   const act = async (action: () => Promise<unknown>, success: string) => {
     setError("");
@@ -77,6 +134,18 @@ export function AdminPage() {
       `${person.username} was ${person.is_banned ? "unbanned" : "banned"}.`,
     );
 
+  const reviewBet = async (bet: Bet, approve: boolean, note: string) => {
+    setError("");
+    setInfo("");
+    try {
+      await postJson(approve ? "/admin/bets/approve" : "/admin/bets/decline", { bet_id: bet.id, note });
+      setInfo(`"${bet.title}" was ${approve ? "approved and published" : "declined"}. @${bet.creator_username} got an email.`);
+    } catch (reviewError) {
+      setError(errorMessage(reviewError));
+    }
+    await loadPendingBets();
+  };
+
   const showHistory = async (person: AdminUser) => {
     try {
       const data = await postJson<{ changes: KarmaChange[] }>("/admin/users/karma-history", { user_id: person.id });
@@ -90,10 +159,11 @@ export function AdminPage() {
     <section className="space-y-6">
       <PageTitle
         title="Admin page"
-        subtitle="Users, karma, and bans. More admin tools are on the pages themselves: right-click any wall note, open any bet, or check the links list."
+        subtitle="New bets wait here for you. Below: users, karma, and bans. More admin tools are on the pages themselves: right-click any wall note, open any bet, or check the links list."
       />
       <ErrorText>{error}</ErrorText>
       <InfoText>{info}</InfoText>
+      <PendingBets bets={pendingBets} onReview={reviewBet} />
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[52rem] text-left text-sm">
           <thead>

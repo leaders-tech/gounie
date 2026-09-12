@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from aiohttp import web
 
-from backend.auth.access import require_active_user, require_user
+from backend.auth.access import current_user, require_active_user
 from backend.db.bets import create_bet, create_comment, get_bet, list_bets, list_comments, list_wagers
 from backend.db.connection import utc_now, utc_now_text
 from backend.games.betting import deadline_passed, place_wager, settle_bet
@@ -42,20 +42,36 @@ def parse_deadline(value: object) -> str:
     return parsed.isoformat(timespec="seconds")
 
 
+def may_see_bet(bet: dict, user: dict | None) -> bool:
+    """A bet that is waiting for approval or was declined is only visible to its creator and to the admin."""
+    if bet["approval"] == "approved":
+        return True
+    return user is not None and (bet["creator_id"] == user["id"] or bool(user.get("is_admin")))
+
+
 async def load_bet(request: web.Request, bet_id: int) -> dict:
     bet = await get_bet(request.app["db"], bet_id)
-    if bet is None:
+    if bet is None or not may_see_bet(bet, current_user(request)):
         raise AppError(404, "not_found", "This bet does not exist.")
     return bet
 
 
+def require_approved(bet: dict) -> None:
+    if bet["approval"] == "pending":
+        raise AppError(403, "not_approved", "This bet is still waiting for the admin to approve it.")
+    if bet["approval"] == "declined":
+        raise AppError(403, "not_approved", "This bet was not approved, so it never went live.")
+
+
 async def bets_list(request: web.Request) -> web.Response:
-    require_user(request)
-    return ok({"bets": await list_bets(request.app["db"]), "server_now": utc_now_text()})
+    """Anyone can read the published bets, also without an account. Your own waiting bets are listed for you only."""
+    user = current_user(request)
+    bets = await list_bets(request.app["db"], user["id"] if user else 0, bool(user and user.get("is_admin")))
+    return ok({"bets": bets, "server_now": utc_now_text()})
 
 
 async def bets_get(request: web.Request) -> web.Response:
-    require_user(request)
+    """Anyone can read one published bet with its wagers and messages, also without an account."""
     payload = await read_json(request)
     bet = await load_bet(request, read_id(payload))
     db = request.app["db"]
@@ -77,7 +93,7 @@ async def bets_create(request: web.Request) -> web.Response:
     description = read_text(payload, "description", label="Description", max_length=2000)
     deadline_at = parse_deadline(payload.get("deadline_at"))
     bet = await create_bet(request.app["db"], user["id"], title, description, deadline_at)
-    LOGGER.info("Bet created bet=%s creator=%s deadline=%s title=%r", bet["id"], user["id"], deadline_at, title)
+    LOGGER.info("Bet created and waiting for approval bet=%s creator=%s deadline=%s title=%r", bet["id"], user["id"], deadline_at, title)
     await request.app["ws_hub"].broadcast({"type": "bet.changed", "bet_id": bet["id"]})
     return ok({"bet": bet})
 
@@ -86,10 +102,11 @@ async def bets_wager(request: web.Request) -> web.Response:
     require_allowed_origin(request)
     user = await require_active_user(request)
     payload = await read_json(request)
-    bet_id = read_id(payload, "bet_id")
+    bet = await load_bet(request, read_id(payload, "bet_id"))
+    require_approved(bet)
     side = read_choice(payload, "side", label="Side", choices=SIDES)
     amount = read_int(payload, "amount", label="Amount", minimum=1, maximum=MAX_WAGER)
-    result = await place_wager(request.app, bet_id, user["id"], side, amount)
+    result = await place_wager(request.app, bet["id"], user["id"], side, amount)
     return ok(result)
 
 
@@ -98,6 +115,7 @@ async def bets_resolve(request: web.Request) -> web.Response:
     user = await require_active_user(request)
     payload = await read_json(request)
     bet = await load_bet(request, read_id(payload, "bet_id"))
+    require_approved(bet)
     outcome = read_choice(payload, "outcome", label="Outcome", choices=SIDES)
     if bet["creator_id"] != user["id"]:
         LOGGER.info("Bet reveal rejected (not creator) bet=%s user=%s", bet["id"], user["id"])
@@ -117,6 +135,7 @@ async def bets_comment(request: web.Request) -> web.Response:
     user = await require_active_user(request)
     payload = await read_json(request)
     bet = await load_bet(request, read_id(payload, "bet_id"))
+    require_approved(bet)
     text = read_text(payload, "text", label="Comment", min_length=1, max_length=1000)
     comment = await create_comment(request.app["db"], bet["id"], user["id"], text)
     LOGGER.info("Bet comment posted comment=%s bet=%s author=%s", comment.get("id"), bet["id"], user["id"])

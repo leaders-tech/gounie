@@ -34,7 +34,7 @@ export function WallDirectoryPage() {
 
   return (
     <section>
-      <PageTitle title="The Wall" subtitle="Everybody has a wall. Pick one and stick a note on it." />
+      <PageTitle title="The Wall" subtitle="Remember that, Du Rove?" />
       <div className="mb-6 flex flex-wrap items-center gap-3">
         {user ? (
           <Link className="rounded-xl border-2 border-stone-900 bg-yellow-300 px-4 py-2 font-bold shadow-[3px_3px_0_#1c1917]" to={`/u/${user.username}`}>

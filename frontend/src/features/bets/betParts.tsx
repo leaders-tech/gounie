@@ -6,9 +6,15 @@ Copy a component pattern here when you add another small shared bet display piec
 
 import type { Bet } from "../../shared/types";
 
-export type BetPhase = "betting" | "waiting" | "closed";
+export type BetPhase = "review" | "declined" | "betting" | "waiting" | "closed";
 
-export function betPhase(bet: Pick<Bet, "status" | "deadline_at">, now = Date.now()): BetPhase {
+export function betPhase(bet: Pick<Bet, "status" | "deadline_at" | "approval">, now = Date.now()): BetPhase {
+  if (bet.approval === "pending") {
+    return "review";
+  }
+  if (bet.approval === "declined") {
+    return "declined";
+  }
   if (bet.status !== "open") {
     return "closed";
   }
@@ -18,7 +24,13 @@ export function betPhase(bet: Pick<Bet, "status" | "deadline_at">, now = Date.no
 export function BetStatusBadge({ bet }: { bet: Bet }) {
   let label = "Waiting for the outcome";
   let color = "bg-sky-300";
-  if (bet.status === "resolved") {
+  if (bet.approval === "pending") {
+    label = "Waiting for the admin";
+    color = "bg-amber-200";
+  } else if (bet.approval === "declined") {
+    label = "Not approved";
+    color = "bg-stone-200";
+  } else if (bet.status === "resolved") {
     label = `Outcome: ${bet.outcome === "yes" ? "YES" : "NO"}`;
     color = bet.outcome === "yes" ? "bg-lime-300" : "bg-rose-300";
   } else if (bet.status === "cancelled") {

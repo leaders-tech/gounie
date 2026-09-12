@@ -32,12 +32,12 @@ async def place_wager(app: web.Application, bet_id: int, user_id: int, side: str
         bet = await get_bet(db, bet_id)
         if bet is None:
             raise AppError(404, "not_found", "This bet does not exist.")
+        if bet["approval"] != "approved":
+            raise AppError(403, "not_approved", "This bet is not live: the admin has not approved it.")
         if bet["status"] != "open":
             raise AppError(400, "bet_closed", "This bet is already closed.")
         if deadline_passed(bet):
             raise AppError(400, "deadline_passed", "Betting time for this bet is over.")
-        if bet["creator_id"] == user_id:
-            raise AppError(403, "own_bet", "You can't bet on your own bet.")
         if await get_wager(db, bet_id, user_id) is not None:
             raise AppError(409, "already_wagered", "You already placed a wager on this bet.")
         karma = await get_karma(db, user_id) or 0

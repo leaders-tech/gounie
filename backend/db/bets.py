@@ -14,7 +14,7 @@ from backend.db.connection import fetch_returning, utc_now_text
 
 BET_SELECT = """
     SELECT b.id, b.creator_id, c.username AS creator_username, b.title, b.description, b.deadline_at,
-           b.status, b.outcome, b.resolved_at, b.created_at,
+           b.status, b.outcome, b.resolved_at, b.created_at, b.approval, b.review_note, b.reviewed_at,
            (SELECT COUNT(*) FROM bet_wagers w WHERE w.bet_id = b.id) AS wager_count,
            (SELECT COALESCE(SUM(w.amount), 0) FROM bet_wagers w WHERE w.bet_id = b.id AND w.side = 'yes') AS yes_total,
            (SELECT COALESCE(SUM(w.amount), 0) FROM bet_wagers w WHERE w.bet_id = b.id AND w.side = 'no') AS no_total,
@@ -24,8 +24,18 @@ BET_SELECT = """
 """
 
 
-async def list_bets(db: aiosqlite.Connection) -> list[dict[str, Any]]:
-    cursor = await db.execute(f"{BET_SELECT} ORDER BY b.id DESC LIMIT 500")
+async def list_bets(db: aiosqlite.Connection, viewer_id: int = 0, is_admin: bool = False) -> list[dict[str, Any]]:
+    """List published bets. The creator also sees their own bets waiting for approval, the admin sees all of them."""
+    cursor = await db.execute(
+        f"{BET_SELECT} WHERE b.approval = 'approved' OR b.creator_id = ? OR ? = 1 ORDER BY b.id DESC LIMIT 500",
+        (viewer_id, int(is_admin)),
+    )
+    return [dict(row) for row in await cursor.fetchall()]
+
+
+async def list_bets_by_approval(db: aiosqlite.Connection, approval: str) -> list[dict[str, Any]]:
+    """List bets in one approval state, oldest first. The admin page uses this for the waiting queue."""
+    cursor = await db.execute(f"{BET_SELECT} WHERE b.approval = ? ORDER BY b.id LIMIT 500", (approval,))
     return [dict(row) for row in await cursor.fetchall()]
 
 
@@ -36,12 +46,13 @@ async def get_bet(db: aiosqlite.Connection, bet_id: int) -> dict[str, Any] | Non
 
 
 async def create_bet(db: aiosqlite.Connection, creator_id: int, title: str, description: str, deadline_at: str) -> dict[str, Any]:
+    """Save a new bet. It waits for admin approval until an admin approves or declines it."""
     now = utc_now_text()
     row = await fetch_returning(
         db,
         """
-        INSERT INTO bets (creator_id, title, description, deadline_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO bets (creator_id, title, description, deadline_at, approval, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?)
         RETURNING id
         """,
         (creator_id, title, description, deadline_at, now, now),
@@ -51,6 +62,21 @@ async def create_bet(db: aiosqlite.Connection, creator_id: int, title: str, desc
     if bet is None:
         raise ValueError("Bet was not saved.")
     return bet
+
+
+async def set_bet_approval(db: aiosqlite.Connection, bet_id: int, approval: str, reviewer_id: int, note: str) -> bool:
+    """Approve or decline a waiting bet. Returns False when the bet was already reviewed."""
+    now = utc_now_text()
+    cursor = await db.execute(
+        """
+        UPDATE bets
+        SET approval = ?, reviewed_by = ?, reviewed_at = ?, review_note = ?, updated_at = ?
+        WHERE id = ? AND approval = 'pending'
+        """,
+        (approval, reviewer_id, now, note, now, bet_id),
+    )
+    await db.commit()
+    return cursor.rowcount > 0
 
 
 async def list_wagers(db: aiosqlite.Connection, bet_id: int) -> list[dict[str, Any]]:
@@ -107,7 +133,10 @@ async def set_wager_payout(db: aiosqlite.Connection, wager_id: int, payout: int)
 
 
 async def list_abandoned_bet_ids(db: aiosqlite.Connection, cutoff_text: str) -> list[int]:
-    cursor = await db.execute("SELECT id FROM bets WHERE status = 'open' AND deadline_at <= ? ORDER BY id", (cutoff_text,))
+    cursor = await db.execute(
+        "SELECT id FROM bets WHERE status = 'open' AND approval = 'approved' AND deadline_at <= ? ORDER BY id",
+        (cutoff_text,),
+    )
     return [int(row["id"]) for row in await cursor.fetchall()]
 
 

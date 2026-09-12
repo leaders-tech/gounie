@@ -11,16 +11,25 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from backend.db.karma import get_karma
-from backend.tests.conftest import ADMIN_PASSWORD, api, login_as
+from backend.tests.conftest import ADMIN_PASSWORD, api, approve_bet, login_as
 
 
 def future(hours: int = 2) -> str:
     return (datetime.now(tz=UTC) + timedelta(hours=hours)).isoformat()
 
 
-async def make_bet(client, cookies, title: str = "Will it snow on Friday?") -> dict:
+async def propose_bet(client, cookies, title: str = "Will it snow on Friday?") -> dict:
+    """Create a bet. It is only proposed: it waits for the admin until somebody approves it."""
     status, payload = await api(client, "/api/bets/create", {"title": title, "description": "Only real snow counts.", "deadline_at": future()}, cookies)
     assert status == 200, payload
+    return payload["data"]["bet"]
+
+
+async def make_bet(client, cookies, title: str = "Will it snow on Friday?") -> dict:
+    """Create a bet and approve it, so the test can go straight to betting."""
+    bet = await propose_bet(client, cookies, title)
+    await approve_bet(client, bet["id"])
+    _, payload = await api(client, "/api/bets/get", {"id": bet["id"]}, cookies)
     return payload["data"]["bet"]
 
 
@@ -46,6 +55,7 @@ async def test_create_and_list_bet(client, people) -> None:
     _, cookies = people
     bet = await make_bet(client, cookies["carol"])
     assert bet["status"] == "open"
+    assert bet["approval"] == "approved"
     assert bet["creator_username"] == "carol"
     assert bet["deadline_at"].endswith("+00:00")
 
@@ -88,12 +98,16 @@ async def test_wager_deducts_karma_and_is_final(client, db, people) -> None:
 
 
 @pytest.mark.asyncio
-async def test_creator_cannot_wager(client, people) -> None:
-    _, cookies = people
+async def test_creator_can_wager_on_their_own_bet(client, db, people) -> None:
+    ids, cookies = people
     bet = await make_bet(client, cookies["carol"])
-    status, payload = await wager(client, cookies["carol"], bet["id"], "yes", 1)
-    assert status == 403
-    assert payload["error"]["code"] == "own_bet"
+    status, payload = await wager(client, cookies["carol"], bet["id"], "yes", 10)
+    assert status == 200
+    assert payload["data"]["karma"] == -10
+    assert await get_karma(db, ids["carol"]) == -10
+    # A second wager on the same bet is still blocked, creator included.
+    status, payload = await wager(client, cookies["carol"], bet["id"], "no", 1)
+    assert status == 409
 
 
 @pytest.mark.asyncio
@@ -210,3 +224,26 @@ async def test_unknown_bet_returns_404(client, people) -> None:
     _, cookies = people
     assert (await api(client, "/api/bets/get", {"id": 9999}, cookies["alice"]))[0] == 404
     assert (await wager(client, cookies["alice"], 9999, "yes", 1))[0] == 404
+
+
+@pytest.mark.asyncio
+async def test_visitors_can_read_bets_but_not_change_anything(client, people) -> None:
+    _, cookies = people
+    bet = await make_bet(client, cookies["carol"])
+    await wager(client, cookies["alice"], bet["id"], "yes", 3)
+    await api(client, "/api/bets/comment", {"bet_id": bet["id"], "text": "I think yes"}, cookies["alice"])
+
+    status, payload = await api(client, "/api/bets/list")
+    assert status == 200
+    assert [item["id"] for item in payload["data"]["bets"]] == [bet["id"]]
+
+    status, payload = await api(client, "/api/bets/get", {"id": bet["id"]})
+    assert status == 200
+    assert payload["data"]["bet"]["title"] == bet["title"]
+    assert [item["username"] for item in payload["data"]["wagers"]] == ["alice"]
+    assert [item["text"] for item in payload["data"]["comments"]] == ["I think yes"]
+
+    assert (await api(client, "/api/bets/create", {"title": "Visitor bet", "deadline_at": future()}))[0] == 401
+    assert (await api(client, "/api/bets/wager", {"bet_id": bet["id"], "side": "yes", "amount": 1}))[0] == 401
+    assert (await api(client, "/api/bets/comment", {"bet_id": bet["id"], "text": "hello"}))[0] == 401
+    assert (await api(client, "/api/bets/resolve", {"bet_id": bet["id"], "outcome": "yes"}))[0] == 401

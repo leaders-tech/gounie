@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="gounie">
+  <g transform="rotate(-4 16 16)">
+    <rect x="2.5" y="4" width="27" height="24" rx="6" fill="#fde047" stroke="#1c1917" stroke-width="2.5" />
+    <text
+      x="16"
+      y="23"
+      fill="#1c1917"
+      font-family="Segoe UI, Helvetica Neue, Arial, sans-serif"
+      font-size="19"
+      font-weight="900"
+      text-anchor="middle"
+    >g</text>
+  </g>
+</svg>

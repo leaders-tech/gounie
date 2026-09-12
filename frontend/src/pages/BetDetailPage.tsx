@@ -37,6 +37,7 @@ export function BetDetailPage() {
   const [side, setSide] = useState<BetSide>("yes");
   const [amount, setAmount] = useState("10");
   const [comment, setComment] = useState("");
+  const [reviewNote, setReviewNote] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -59,9 +60,6 @@ export function BetDetailPage() {
     }
   });
 
-  if (!user) {
-    return null;
-  }
   if (loading) {
     return <p className="text-stone-600">Loading bet...</p>;
   }
@@ -71,8 +69,9 @@ export function BetDetailPage() {
 
   const { bet, wagers, comments } = details;
   const phase = betPhase(bet);
-  const isCreator = bet.creator_id === user.id;
-  const myWager = wagers.find((wager) => wager.user_id === user.id);
+  const isLive = bet.approval === "approved";
+  const isCreator = user ? bet.creator_id === user.id : false;
+  const myWager = user ? wagers.find((wager) => wager.user_id === user.id) : undefined;
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -106,20 +105,37 @@ export function BetDetailPage() {
   const closeAction = (path: string, body: Record<string, unknown>) => () => void run(async () => void (await postJson(path, { bet_id: bet.id, ...body })));
 
   let yourMove: React.ReactNode;
-  if (myWager) {
+  if (bet.approval === "pending") {
     yourMove = (
       <p>
-        You bet <strong>{myWager.amount} karma</strong> on <SideLabel side={myWager.side} />.{" "}
-        {myWager.payout === null ? "Now wait for the outcome." : `You got ${myWager.payout} karma back.`}
+        An admin still has to read this bet. Nobody else can see it yet. You get an email as soon as it is approved or not.
+        {bet.creator_id === user?.id ? "" : " Only you and the admin can see this page."}
       </p>
     );
-  } else if (phase === "closed") {
-    yourMove = <p>This bet is closed.</p>;
-  } else if (isCreator && phase === "betting") {
-    yourMove = <p>This is your bet, so you can't bet on it. Come back after betting closes to reveal what happened.</p>;
-  } else if (isCreator) {
+  } else if (bet.approval === "declined") {
+    yourMove = (
+      <div className="space-y-2">
+        <p>This bet was not approved, so it never went live. Nobody lost any karma.</p>
+        {bet.review_note ? <p className="text-sm text-stone-600">The admin said: {bet.review_note}</p> : null}
+      </div>
+    );
+  } else if (!user) {
+    yourMove = (
+      <p>
+        <Link className="font-bold underline" to="/login">
+          Log in
+        </Link>{" "}
+        to place a bet or write a message.
+      </p>
+    );
+  } else if (isCreator && phase === "waiting") {
     yourMove = (
       <div className="space-y-3">
+        {myWager ? (
+          <p>
+            You bet <strong>{myWager.amount} karma</strong> on <SideLabel side={myWager.side} />. Now reveal what happened.
+          </p>
+        ) : null}
         <p className="font-semibold">Betting is over. What happened?</p>
         <div className="flex flex-wrap gap-3">
           <Button disabled={busy} onClick={closeAction("/bets/resolve", { outcome: "yes" })}>
@@ -132,6 +148,15 @@ export function BetDetailPage() {
         <p className="text-xs text-stone-600">If you don't reveal within 7 days after the deadline, everyone gets their karma back.</p>
       </div>
     );
+  } else if (myWager) {
+    yourMove = (
+      <p>
+        You bet <strong>{myWager.amount} karma</strong> on <SideLabel side={myWager.side} />.{" "}
+        {myWager.payout === null ? "Now wait for the outcome." : `You got ${myWager.payout} karma back.`}
+      </p>
+    );
+  } else if (phase === "closed") {
+    yourMove = <p>This bet is closed.</p>;
   } else if (phase === "betting") {
     yourMove = (
       <form className="space-y-3" onSubmit={placeWager}>
@@ -160,7 +185,7 @@ export function BetDetailPage() {
           />
         </label>
         <p className="text-sm text-stone-600">
-          You have {user.karma} karma. The stake is taken now. If you are right, you get 2× back. One bet per person, no changes.
+          You have {user?.karma ?? 0} karma. The stake is taken now. If you are right, you get 2× back. One bet per person, no changes.
         </p>
         <Button disabled={busy} type="submit">
           Place bet
@@ -200,7 +225,29 @@ export function BetDetailPage() {
         <ErrorText>{actionError}</ErrorText>
       </Card>
 
-      {user.is_admin && bet.status === "open" ? (
+      {user?.is_admin && bet.approval === "pending" ? (
+        <Card className="space-y-3 bg-amber-100">
+          <h2 className="text-xl font-black">🛡️ Waiting for your decision</h2>
+          <p className="text-sm text-stone-700">@{bet.creator_username} gets an email with your decision. Only approved bets are published.</p>
+          <TextArea
+            label="Note for the creator (optional)"
+            maxLength={500}
+            onChange={(event) => setReviewNote(event.target.value)}
+            rows={2}
+            value={reviewNote}
+          />
+          <div className="flex flex-wrap gap-3">
+            <Button disabled={busy} onClick={closeAction("/admin/bets/approve", { note: reviewNote })}>
+              Approve and publish
+            </Button>
+            <Button disabled={busy} onClick={closeAction("/admin/bets/decline", { note: reviewNote })} variant="danger">
+              Decline
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {user?.is_admin && isLive && bet.status === "open" ? (
         <Card className="space-y-3 bg-amber-100">
           <h2 className="text-xl font-black">🛡️ Admin tools</h2>
           <div className="flex flex-wrap gap-3">
@@ -217,62 +264,75 @@ export function BetDetailPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <h2 className="text-xl font-black">Bets ({wagers.length})</h2>
-        {wagers.length === 0 ? (
-          <p className="mt-2 text-stone-600">Nobody has placed a bet yet.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-stone-200">
-            {wagers.map((wager) => (
-              <li className="flex flex-wrap items-center gap-3 py-2" key={wager.id}>
-                <Link className="flex items-center gap-2 font-bold hover:underline" to={`/u/${wager.username}`}>
-                  <Avatar size="sm" username={wager.username} />
-                  {wager.username}
-                </Link>
-                <SideLabel side={wager.side} />
-                <span className="ml-auto font-semibold">{wager.amount} karma</span>
-                {wager.payout !== null ? <span className="text-sm text-stone-600">got back {wager.payout}</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      {isLive ? (
+        <>
+          <Card>
+            <h2 className="text-xl font-black">Bets ({wagers.length})</h2>
+            {wagers.length === 0 ? (
+              <p className="mt-2 text-stone-600">Nobody has placed a bet yet.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-stone-200">
+                {wagers.map((wager) => (
+                  <li className="flex flex-wrap items-center gap-3 py-2" key={wager.id}>
+                    <Link className="flex items-center gap-2 font-bold hover:underline" to={`/u/${wager.username}`}>
+                      <Avatar size="sm" username={wager.username} />
+                      {wager.username}
+                    </Link>
+                    <SideLabel side={wager.side} />
+                    <span className="ml-auto font-semibold">{wager.amount} karma</span>
+                    {wager.payout !== null ? <span className="text-sm text-stone-600">got back {wager.payout}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
-      <Card className="space-y-4">
-        <h2 className="text-xl font-black">Discussion</h2>
-        {comments.length === 0 ? <p className="text-stone-600">No messages yet. Say something smart.</p> : null}
-        <ul className="space-y-3">
-          {comments.map((item) => (
-            <li className="flex gap-3" key={item.id}>
-              <Avatar size="sm" username={item.author_username} />
-              <div className="min-w-0 flex-1 rounded-xl border-2 border-stone-900 bg-amber-50 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
-                  <Link className="font-bold text-stone-900 hover:underline" to={`/u/${item.author_username}`}>
-                    @{item.author_username}
-                  </Link>
-                  <time dateTime={item.created_at}>{formatDateTime(item.created_at)}</time>
-                  {user.is_admin ? (
-                    <button
-                      className="ml-auto font-semibold text-rose-700 hover:underline"
-                      onClick={() => void run(async () => void (await postJson("/admin/comments/delete", { id: item.id })))}
-                      type="button"
-                    >
-                      Delete
-                    </button>
-                  ) : null}
-                </div>
-                <p className="mt-1 whitespace-pre-wrap break-words">{item.text}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <form className="space-y-3" onSubmit={postComment}>
-          <TextArea label="Your message" maxLength={1000} onChange={(event) => setComment(event.target.value)} rows={3} value={comment} />
-          <Button disabled={busy || !comment.trim()} type="submit">
-            Post message
-          </Button>
-        </form>
-      </Card>
+          <Card className="space-y-4">
+            <h2 className="text-xl font-black">Discussion</h2>
+            {comments.length === 0 ? <p className="text-stone-600">No messages yet. Say something smart.</p> : null}
+            <ul className="space-y-3">
+              {comments.map((item) => (
+                <li className="flex gap-3" key={item.id}>
+                  <Avatar size="sm" username={item.author_username} />
+                  <div className="min-w-0 flex-1 rounded-xl border-2 border-stone-900 bg-amber-50 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
+                      <Link className="font-bold text-stone-900 hover:underline" to={`/u/${item.author_username}`}>
+                        @{item.author_username}
+                      </Link>
+                      <time dateTime={item.created_at}>{formatDateTime(item.created_at)}</time>
+                      {user?.is_admin ? (
+                        <button
+                          className="ml-auto font-semibold text-rose-700 hover:underline"
+                          onClick={() => void run(async () => void (await postJson("/admin/comments/delete", { id: item.id })))}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap break-words">{item.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {user ? (
+              <form className="space-y-3" onSubmit={postComment}>
+                <TextArea label="Your message" maxLength={1000} onChange={(event) => setComment(event.target.value)} rows={3} value={comment} />
+                <Button disabled={busy || !comment.trim()} type="submit">
+                  Post message
+                </Button>
+              </form>
+            ) : (
+              <p className="text-stone-600">
+                <Link className="font-bold underline" to="/login">
+                  Log in
+                </Link>{" "}
+                to write a message.
+              </p>
+            )}
+          </Card>
+        </>
+      ) : null}
     </section>
   );
 }

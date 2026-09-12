@@ -62,4 +62,24 @@ describe("shared api helper", () => {
     expect(wsUrl.pathname).toBe("/ws");
     expect(wsUrl.protocol).toBe(window.location.protocol === "https:" ? "wss:" : "ws:");
   });
+
+  it("explains that the backend is not running when the answer is empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 500 })));
+    const { ApiError, postJson } = await import("./api");
+
+    const error = await postJson("/bets/list").catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ code: "empty_response" });
+    expect((error as InstanceType<typeof ApiError>).message).toBe("Could not reach the server. Is the backend running?");
+  });
+
+  it("explains that the backend is not running when the request fails completely", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    const { ApiError, postJson } = await import("./api");
+
+    const error = await postJson("/links/list").catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ code: "no_server" });
+    expect((error as InstanceType<typeof ApiError>).message).toBe("Could not reach the server. Is the backend running?");
+  });
 });

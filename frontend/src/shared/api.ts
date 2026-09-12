@@ -33,10 +33,13 @@ export function apiUrl(path: string): string {
   return `${apiBasePath}${normalizedPath}`;
 }
 
+/** Shown when the backend is not running: the dev server then answers with an empty error page. */
+export const SERVER_UNREACHABLE = "Could not reach the server. Is the backend running?";
+
 async function readApiPayload<T>(response: Response): Promise<ApiResponse<T>> {
   const text = await response.text();
   if (!text) {
-    throw new ApiError(response.status, "empty_response", "Server returned an empty response.");
+    throw new ApiError(response.status, "empty_response", SERVER_UNREACHABLE);
   }
 
   try {
@@ -47,14 +50,20 @@ async function readApiPayload<T>(response: Response): Promise<ApiResponse<T>> {
 }
 
 export async function postJson<T>(path: string, body: unknown = {}): Promise<T> {
-  const response = await fetch(apiUrl(path), {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // The browser could not talk to the server at all (server stopped, no network).
+    throw new ApiError(0, "no_server", SERVER_UNREACHABLE);
+  }
 
   const payload = await readApiPayload<T>(response);
   if (!payload.ok) {

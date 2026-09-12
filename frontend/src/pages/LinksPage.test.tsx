@@ -90,4 +90,14 @@ describe("LinksPage", () => {
     await userEvent.type(screen.getByLabelText("Search links"), "py");
     await waitFor(() => expect(postJson).toHaveBeenCalledWith("/links/list", { query: "py" }));
   });
+
+  it("lets visitors read the links but not add or vote", async () => {
+    renderWithAuth(<LinksPage />, { user: null });
+
+    expect(await screen.findByRole("link", { name: "Python docs" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add link" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upvote Python docs" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Downvote Python docs" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+  });
 });

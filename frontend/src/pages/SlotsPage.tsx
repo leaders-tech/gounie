@@ -98,7 +98,15 @@ export function SlotsPage() {
 
   return (
     <section className="space-y-6">
-      <PageTitle title="slots" subtitle="Spin to gamble your karma. Feeling lucky?" />
+      <PageTitle
+        title="slots"
+        subtitle={
+          <>
+            Spin to gamble your karma. <strong>Don&apos;t be a ludik, please!</strong> It won&apos;t return back until 24 hours after your last gamble or
+            betting attempt.
+          </>
+        }
+      />
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="rounded-3xl border-4 border-stone-900 bg-gradient-to-b from-fuchsia-500 to-rose-600 p-6 shadow-[8px_8px_0_#1c1917]">
           <p className="text-center text-2xl font-black tracking-widest text-yellow-200 drop-shadow">★ GOUNIE SLOTS ★</p>

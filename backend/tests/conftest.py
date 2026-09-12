@@ -16,6 +16,7 @@ from yarl import URL
 
 from backend.auth.passwords import hash_password
 from backend.config import Settings
+from backend.db.bets import set_bet_approval
 from backend.db.users import create_user_if_missing, get_user_by_username
 from backend.main import create_app
 
@@ -96,6 +97,14 @@ async def login_as(client: TestClient, username: str, password: str = "password1
     token = response.cookies["gounie_access"].value
     client.session.cookie_jar.clear()
     return {"gounie_access": token}
+
+
+async def approve_bet(client: TestClient, bet_id: int) -> None:
+    """Approve a waiting bet like the admin page does, so a test can go on to the betting part."""
+    db = client.app["db"]
+    admin = await get_user_by_username(db, "admin")
+    assert admin is not None
+    assert await set_bet_approval(db, bet_id, "approved", int(admin["id"]), "")
 
 
 async def api(client: TestClient, path: str, body: dict[str, Any] | None = None, cookies: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:

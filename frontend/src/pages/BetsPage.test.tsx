@@ -71,4 +71,28 @@ describe("BetsPage", () => {
       deadline_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/),
     });
   });
+
+  it("keeps your own waiting bet in its own group", async () => {
+    answerByPath(postJson, {
+      "/bets/list": () => ({
+        bets: [makeBet({ id: 7, title: "Waiting one", approval: "pending" }), makeBet({ id: 8, title: "Refused one", approval: "declined" })],
+      }),
+    });
+    renderWithAuth(<BetsPage />);
+
+    expect(await screen.findByRole("heading", { name: "Your bets waiting for the admin" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Waiting one/ })).toHaveTextContent("Waiting for the admin");
+    expect(screen.getByRole("heading", { name: "Your bets that were not approved" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Refused one/ })).toHaveTextContent("Not approved");
+    expect(screen.queryByRole("heading", { name: "Open for bets" })).not.toBeInTheDocument();
+  });
+
+  it("lets visitors read the bets but not start one", async () => {
+    answerByPath(postJson, { "/bets/list": () => ({ bets: [makeBet({ id: 1, title: "Open one" })] }) });
+    renderWithAuth(<BetsPage />, { user: null });
+
+    expect(await screen.findByRole("link", { name: /Open one/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ New bet" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+  });
 });

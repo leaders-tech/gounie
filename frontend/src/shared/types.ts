@@ -63,6 +63,8 @@ export type WallNote = NoteStyle & {
 
 export type BetStatus = "open" | "resolved" | "cancelled" | "refunded";
 export type BetSide = "yes" | "no";
+/** New bets wait for an admin. Only approved bets are published. */
+export type BetApproval = "pending" | "approved" | "declined";
 
 export type Bet = {
   id: number;
@@ -74,6 +76,9 @@ export type Bet = {
   status: BetStatus;
   outcome: BetSide | null;
   resolved_at: string | null;
+  approval: BetApproval;
+  review_note: string;
+  reviewed_at: string | null;
   created_at: string;
   wager_count: number;
   yes_total: number;

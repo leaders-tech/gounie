@@ -12,7 +12,7 @@ test("Friday page says NO on Thursday and YES! with confetti on Friday", async (
   await page.clock.setFixedTime(new Date(2026, 8, 10, 12, 0, 0));
   await loginInBrowser(page, user);
 
-  await navLink(page, "Friday?").click();
+  await navLink(page, "Is it Friday yet?").click();
   await expect(page.getByTestId("friday-answer")).toHaveText("NO");
   await expect(page.locator("canvas")).toHaveCount(0);
 
